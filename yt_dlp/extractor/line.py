@@ -12,7 +12,7 @@ from ..utils import (
 
 
 class LineTVIE(InfoExtractor):
-    _VALID_URL = r'https?://tv\.line\.me/(?:v|embed)/(?P<id>\d+)(?:_[^/]+-(?P<segment>ep\d+(?:-\d+|))|)'
+    _VALID_URL = r'https?://tv\.line\.me/v/(?P<id>\d+)_[^/]+-(?P<segment>ep\d+-\d+)'
 
     _TESTS = [{
         'url': 'https://tv.line.me/v/793123_goodbye-mrblack-ep1-1/list/69246',
@@ -82,6 +82,36 @@ class LineTVIE(InfoExtractor):
 
         # like_count requires an additional API request https://tv.line.me/api/likeit/getCount
 
+        subtitles = {}
+        sub_fan = "-fan"
+        sub_dict = try_get(video_info, lambda x: x['captions']['list']) or {}
+
+        for sub_index in sub_dict:
+            sub_language = try_get(sub_index, lambda x: x['language'])
+            sub_source = try_get(sub_index, lambda x: x['source'])
+            sub_label = try_get(sub_index, lambda x: x['label'])
+            sub_country = try_get(sub_index, lambda x: x['country'])
+            if subtitles:
+                for subtitle in subtitles.keys(): #Checking for fan sub versions in already provided languages
+                    if subtitle == sub_language + "-" + sub_country or subtitle == sub_language + "-" + sub_country + sub_fan:
+                        sub_lang = sub_language + "-" + sub_country + sub_fan
+                        sub_name = sub_label + sub_fan
+                    else:
+                        sub_lang = sub_language + "-" + sub_country
+                        sub_name = sub_label
+            else:
+                sub_lang = sub_language + "-" + sub_country
+                sub_name = sub_label
+            subtitles.update({
+                sub_lang : [
+                    {
+                        "ext" : "vtt",
+                        "url" : sub_source,
+                        "name": sub_name
+                    }
+                ]
+            })
+
         return {
             'id': video_id,
             'title': title,
@@ -91,6 +121,7 @@ class LineTVIE(InfoExtractor):
             'thumbnails': [{'url': thumbnail['source']}
                            for thumbnail in video_info.get('thumbnails', {}).get('list', [])],
             'view_count': video_info.get('meta', {}).get('count'),
+            'subtitles': subtitles,
         }
 
 
